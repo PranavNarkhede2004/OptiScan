@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://optiscan-u6f2.onrender.com/api/$1"
+    },
+    {
+      "source": "/data/(.*)",
+      "destination": "https://optiscan-u6f2.onrender.com/data/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
