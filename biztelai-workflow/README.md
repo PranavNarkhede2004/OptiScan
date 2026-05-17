@@ -9,7 +9,7 @@ OptiFlow is an AI-powered full-stack web application designed to digitize handwr
 | **Frontend** | React (Vite), TailwindCSS, React Router v6, Recharts, Lucide React         |
 | **Backend**  | Node.js, Express, Multer (file uploads)                                    |
 | **Database** | SQLite (via `better-sqlite3`)                                              |
-| **AI / OCR** | Google Gemini Vision API (`gemini-1.5-flash`) via `@google/generative-ai`  |
+| **AI / OCR** | Google Gemini Vision API (`gemini-2.5-flash`) via `@google/generative-ai`  |
 
 ## Architecture Diagram
 
@@ -32,7 +32,7 @@ OptiFlow is an AI-powered full-stack web application designed to digitize handwr
          |                                          v
          |                        +-----------------------+
          +----------------------> | Google Gemini API     |
-            View Document         | (gemini-1.5-flash)    |
+            View Document         | (gemini-2.5-flash)    |
                                   +-----------------------+
 ```
 
@@ -87,7 +87,7 @@ npm run dev
 *The frontend will run on `http://localhost:5173`. Open this URL in your browser.*
 
 ## Assumptions and Tradeoffs
-- **PDF Handling**: `gemini-1.5-flash` natively supports direct PDF ingestion (via `application/pdf` inline data) up to certain page limits. Rather than implementing complex system-level dependencies like `poppler` to slice PDFs into images, the backend sends the PDF document directly to Gemini, leveraging its native multimodal capabilities.
+- **PDF Handling**: `gemini-2.5-flash` natively supports direct PDF ingestion (via `application/pdf` inline data) up to certain page limits. Rather than implementing complex system-level dependencies like `poppler` to slice PDFs into images, the backend sends the PDF document directly to Gemini, leveraging its native multimodal capabilities.
 - **SQLite**: Chose `better-sqlite3` for fast, synchronous, zero-configuration database access, matching the requirement constraints. 
 - **Soft Deletes**: Deleting a record sets its status to `deleted` rather than removing the row from the database to preserve historical analytics if needed.
 - **Frontend Proxy**: Vite is configured to proxy `/api` and `/data/uploads` requests to the backend `localhost:5000` to avoid CORS issues during local development.
@@ -96,3 +96,6 @@ npm run dev
 - Gemini's OCR extraction speed and formatting accuracy may vary depending on the legibility of handwriting.
 - The free tier of Gemini API is rate-limited; rapid, concurrent uploads may result in 429 errors.
 - Files are stored on the local disk (`backend/data/uploads`). For production scaling, a cloud bucket (like S3) would be necessary.
+
+## AI-Assisted Engineering Evaluation
+We are intentionally evaluating AI-assisted engineering workflows as part of this assignment. For a detailed breakdown of the AI tools used, our prompting/debugging workflows, and the areas requiring manual intervention versus where AI excelled, please refer to the **[AGENTS.md](./AGENTS.md)** file.
