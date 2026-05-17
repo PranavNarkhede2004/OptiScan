@@ -19,6 +19,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/data/uploads', express.static(path.join(__dirname, 'data/uploads')));
 
 // Routes
+app.get('/', (req, res) => {
+  res.json({ success: true, message: 'BiztelAI Workflow Backend API is running smoothly!' });
+});
+
 app.use('/api/uploads', uploadsRouter);
 app.use('/api/records', recordsRouter);
 app.use('/api/analytics', analyticsRouter);
