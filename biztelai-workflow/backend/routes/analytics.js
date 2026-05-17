@@ -28,45 +28,68 @@ router.get('/summary', (req, res) => {
       WHERE status != 'deleted' AND json_array_length(validation_errors) > 0
     `).get().count;
 
-    // Average confidence calculation
-    const records = db.prepare("SELECT confidence_scores FROM records WHERE status != 'deleted' AND confidence_scores IS NOT NULL").all();
-    
-    const weights = {
-      work_order_number: 3,
-      quantity_produced: 3,
-      employee_number: 2,
-      date: 1,
-      shift: 1,
-      machine_number: 0.5,
-      operation_code: 0.5,
-      time_taken: 0.5
+    // === WEIGHTED AVERAGE CONFIDENCE ===
+    // Field weights based on operational criticality
+    const FIELD_WEIGHTS = {
+      work_order_number: 3,   // mission critical — uniquely identifies the job
+      quantity_produced: 3,   // mission critical — core production metric
+      employee_number: 2,     // required for accountability
+      date: 2,                // required for traceability
+      shift: 1.5,             // required for shift analytics
+      machine_number: 1,      // important for machine tracking
+      operation_code: 1,      // important for operation analytics
+      time_taken: 0.5,        // optional but useful
     };
 
-    const requiredFields = ['date', 'shift', 'employee_number', 'work_order_number', 'quantity_produced'];
+    const allRecords = db.prepare(`
+      SELECT * FROM records 
+      WHERE status != 'deleted' AND confidence_scores IS NOT NULL
+    `).all();
 
     let totalWeightedScore = 0;
     let totalWeight = 0;
-    
-    records.forEach(r => {
+    let fieldAccumulator = {};  // track per-field avg for bonus insight
+
+    // initialize field accumulator
+    Object.keys(FIELD_WEIGHTS).forEach(f => {
+      fieldAccumulator[f] = { sum: 0, count: 0 };
+    });
+
+    allRecords.forEach(r => {
       try {
         const scores = JSON.parse(r.confidence_scores);
-        
-        requiredFields.forEach(key => {
-          const val = typeof scores[key] === 'number' ? scores[key] : 0;
-          totalWeightedScore += val * weights[key];
-          totalWeight += weights[key];
-        });
+        Object.entries(FIELD_WEIGHTS).forEach(([field, weight]) => {
+          let score = scores[field];
+          
+          // Penalize missing actual values
+          if (r[field] === null || r[field] === undefined || r[field] === '') {
+            score = 0;
+          }
 
-        Object.entries(scores).forEach(([key, score]) => {
-          if (!requiredFields.includes(key) && typeof score === 'number' && weights[key]) {
-            totalWeightedScore += score * weights[key];
-            totalWeight += weights[key];
+          if (typeof score === 'number' && score >= 0 && score <= 1) {
+            totalWeightedScore += score * weight;
+            totalWeight += weight;
+            fieldAccumulator[field].sum += score;
+            fieldAccumulator[field].count += 1;
           }
         });
       } catch (e) {}
     });
-    
-    const avgConfidence = totalWeight > 0 ? (totalWeightedScore / totalWeight).toFixed(3) : 0;
+
+    const avgConfidence = totalWeight > 0
+      ? parseFloat((totalWeightedScore / totalWeight).toFixed(3))
+      : 0;
+
+    // Per-field average confidence (useful for future dashboard enhancements)
+    const fieldConfidenceBreakdown = Object.entries(fieldAccumulator)
+      .filter(([, v]) => v.count > 0)
+      .map(([field, v]) => ({
+        field,
+        avg: parseFloat((v.sum / v.count).toFixed(3)),
+        weight: FIELD_WEIGHTS[field],
+        sample_count: v.count
+      }))
+      .sort((a, b) => a.avg - b.avg); // lowest confidence fields first
 
     // Shift quantity chart
     const shiftQtyRaw = db.prepare(`
@@ -114,7 +137,8 @@ router.get('/summary', (req, res) => {
         reviewed_count: reviewedCount,
         flagged_count: flaggedCount,
         validation_failure_count: validationFailures,
-        avg_confidence: parseFloat(avgConfidence),
+        avg_confidence: avgConfidence,
+        field_confidence_breakdown: fieldConfidenceBreakdown,
         shift_qty: shiftQty,
         machine_counts: machineCounts,
         uploads_per_day: uploadsPerDay,

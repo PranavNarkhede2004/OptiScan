@@ -60,34 +60,34 @@ export default function History() {
     }
   };
 
-  const getAvgConfidence = (scoresStr) => {
+  const getAvgConfidence = (record) => {
     try {
-      const scores = JSON.parse(scoresStr);
-      const weights = {
+      const scores = JSON.parse(record.confidence_scores);
+      const FIELD_WEIGHTS = {
         work_order_number: 3,
         quantity_produced: 3,
         employee_number: 2,
-        date: 1,
-        shift: 1,
-        machine_number: 0.5,
-        operation_code: 0.5,
-        time_taken: 0.5
+        date: 2,
+        shift: 1.5,
+        machine_number: 1,
+        operation_code: 1,
+        time_taken: 0.5,
       };
       
-      const requiredFields = ['date', 'shift', 'employee_number', 'work_order_number', 'quantity_produced'];
       let totalWeightedScore = 0;
       let totalWeight = 0;
       
-      requiredFields.forEach(key => {
-        const val = typeof scores[key] === 'number' ? scores[key] : 0;
-        totalWeightedScore += val * weights[key];
-        totalWeight += weights[key];
-      });
+      Object.entries(FIELD_WEIGHTS).forEach(([field, weight]) => {
+        let score = scores[field];
 
-      Object.entries(scores).forEach(([key, val]) => {
-        if (!requiredFields.includes(key) && typeof val === 'number' && weights[key]) {
-          totalWeightedScore += val * weights[key];
-          totalWeight += weights[key];
+        // Penalize missing actual values
+        if (record[field] === null || record[field] === undefined || record[field] === '') {
+          score = 0;
+        }
+
+        if (typeof score === 'number' && score >= 0 && score <= 1) {
+          totalWeightedScore += score * weight;
+          totalWeight += weight;
         }
       });
       
@@ -187,7 +187,7 @@ export default function History() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{r.work_order_number || '-'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{r.machine_number || '-'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 font-medium">{r.quantity_produced !== null ? r.quantity_produced : '-'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{getAvgConfidence(r.confidence_scores)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{getAvgConfidence(r)}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColors[r.status] || 'bg-slate-100 text-slate-800'}`}>
                         {r.status?.replace('_', ' ')}
