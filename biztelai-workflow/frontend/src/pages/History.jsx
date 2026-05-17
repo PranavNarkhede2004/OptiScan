@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import client from '../api/client';
 import { Search, Filter, ChevronLeft, ChevronRight, Edit } from 'lucide-react';
 
@@ -15,6 +15,8 @@ function useDebounce(value, delay) {
 
 export default function History() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const uploadIdParam = searchParams.get('upload_id');
   const [records, setRecords] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -31,7 +33,7 @@ export default function History() {
 
   useEffect(() => {
     fetchRecords();
-  }, [debouncedSearch, shift, status, dateFrom, dateTo, page]);
+  }, [debouncedSearch, shift, status, dateFrom, dateTo, page, uploadIdParam]);
 
   const fetchRecords = async () => {
     setLoading(true);
@@ -44,6 +46,7 @@ export default function History() {
         ...(status !== 'All' && { status }),
         ...(dateFrom && { from: dateFrom }),
         ...(dateTo && { to: dateTo }),
+        ...(uploadIdParam && { upload_id: uploadIdParam }),
       });
       const res = await client.get(`/records?${params.toString()}`);
       if (res.data.success) {
@@ -60,9 +63,36 @@ export default function History() {
   const getAvgConfidence = (scoresStr) => {
     try {
       const scores = JSON.parse(scoresStr);
-      const vals = Object.values(scores).filter(s => typeof s === 'number');
-      if (vals.length === 0) return '-';
-      const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+      const weights = {
+        work_order_number: 3,
+        quantity_produced: 3,
+        employee_number: 2,
+        date: 1,
+        shift: 1,
+        machine_number: 0.5,
+        operation_code: 0.5,
+        time_taken: 0.5
+      };
+      
+      const requiredFields = ['date', 'shift', 'employee_number', 'work_order_number', 'quantity_produced'];
+      let totalWeightedScore = 0;
+      let totalWeight = 0;
+      
+      requiredFields.forEach(key => {
+        const val = typeof scores[key] === 'number' ? scores[key] : 0;
+        totalWeightedScore += val * weights[key];
+        totalWeight += weights[key];
+      });
+
+      Object.entries(scores).forEach(([key, val]) => {
+        if (!requiredFields.includes(key) && typeof val === 'number' && weights[key]) {
+          totalWeightedScore += val * weights[key];
+          totalWeight += weights[key];
+        }
+      });
+      
+      if (totalWeight === 0) return '-';
+      const avg = totalWeightedScore / totalWeight;
       return (avg * 100).toFixed(0) + '%';
     } catch {
       return '-';
@@ -79,9 +109,16 @@ export default function History() {
     <div className="p-8 max-w-7xl mx-auto h-full flex flex-col">
       <div className="mb-6 flex justify-between items-end flex-shrink-0">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Record History</h1>
-          <p className="mt-2 text-slate-600">Total {total} records found</p>
+          <h1 className="text-3xl font-bold text-slate-900">
+            {uploadIdParam ? 'Batch Review' : 'Record History'}
+          </h1>
+          <p className="mt-2 text-slate-600">Total {total} records found {uploadIdParam && 'for this document'}</p>
         </div>
+        {uploadIdParam && (
+          <button onClick={() => navigate('/history')} className="text-sm font-medium text-indigo-600 hover:text-indigo-800">
+            Clear filter &rarr;
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 p-4 flex-shrink-0">

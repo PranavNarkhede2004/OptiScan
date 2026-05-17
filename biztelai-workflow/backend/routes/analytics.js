@@ -30,22 +30,43 @@ router.get('/summary', (req, res) => {
 
     // Average confidence calculation
     const records = db.prepare("SELECT confidence_scores FROM records WHERE status != 'deleted' AND confidence_scores IS NOT NULL").all();
-    let totalScore = 0;
-    let scoreCount = 0;
+    
+    const weights = {
+      work_order_number: 3,
+      quantity_produced: 3,
+      employee_number: 2,
+      date: 1,
+      shift: 1,
+      machine_number: 0.5,
+      operation_code: 0.5,
+      time_taken: 0.5
+    };
+
+    const requiredFields = ['date', 'shift', 'employee_number', 'work_order_number', 'quantity_produced'];
+
+    let totalWeightedScore = 0;
+    let totalWeight = 0;
     
     records.forEach(r => {
       try {
         const scores = JSON.parse(r.confidence_scores);
-        Object.values(scores).forEach(score => {
-          if (typeof score === 'number') {
-            totalScore += score;
-            scoreCount++;
+        
+        requiredFields.forEach(key => {
+          const val = typeof scores[key] === 'number' ? scores[key] : 0;
+          totalWeightedScore += val * weights[key];
+          totalWeight += weights[key];
+        });
+
+        Object.entries(scores).forEach(([key, score]) => {
+          if (!requiredFields.includes(key) && typeof score === 'number' && weights[key]) {
+            totalWeightedScore += score * weights[key];
+            totalWeight += weights[key];
           }
         });
       } catch (e) {}
     });
     
-    const avgConfidence = scoreCount > 0 ? (totalScore / scoreCount).toFixed(2) : 0;
+    const avgConfidence = totalWeight > 0 ? (totalWeightedScore / totalWeight).toFixed(3) : 0;
 
     // Shift quantity chart
     const shiftQtyRaw = db.prepare(`

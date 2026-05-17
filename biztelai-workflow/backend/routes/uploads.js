@@ -52,9 +52,10 @@ router.get('/', (req, res) => {
     const offset = parseInt(req.query.offset) || 0;
 
     const uploads = db.prepare(`
-      SELECT u.*, r.id as record_id 
+      SELECT u.*, COUNT(r.id) as record_count, MIN(r.id) as record_id 
       FROM uploads u
       LEFT JOIN records r ON u.id = r.upload_id
+      GROUP BY u.id
       ORDER BY u.created_at DESC
       LIMIT ? OFFSET ?
     `).all(limit, offset);

@@ -6,7 +6,7 @@ const { validateRecord } = require('../utils/validator');
 // GET /api/records
 router.get('/', (req, res) => {
   try {
-    let { search, shift, status, from, to, limit = 20, offset = 0 } = req.query;
+    let { search, shift, status, from, to, upload_id, limit = 20, offset = 0 } = req.query;
     limit = parseInt(limit);
     offset = parseInt(offset);
 
@@ -43,6 +43,12 @@ router.get('/', (req, res) => {
       query += ' AND date <= ?';
       countQuery += ' AND date <= ?';
       params.push(to);
+    }
+
+    if (upload_id) {
+      query += ' AND upload_id = ?';
+      countQuery += ' AND upload_id = ?';
+      params.push(upload_id);
     }
 
     query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';

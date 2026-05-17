@@ -7,6 +7,10 @@ const validateRecord = (data, confidenceScores, currentRecordId = null) => {
   // ERRORS
   if (!data.date) {
     errors.push("Date is required");
+  } else {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data.date) || isNaN(new Date(data.date).getTime())) {
+      errors.push("Invalid date format. Expected YYYY-MM-DD");
+    }
   }
   
   if (!['A', 'B', 'C', 'Night'].includes(data.shift)) {
@@ -15,11 +19,16 @@ const validateRecord = (data, confidenceScores, currentRecordId = null) => {
   
   if (!data.employee_number) {
     errors.push("Employee number is required");
+  } else if (!/^BT\d{4}$/i.test(data.employee_number)) {
+    errors.push("Invalid employee number format. Expected BTXXXX");
   }
   
   if (!data.work_order_number) {
     errors.push("Work order number is required");
   } else {
+    if (!/^\d{6}$/.test(data.work_order_number)) {
+      errors.push("Invalid work order format. Expected 6 digits");
+    }
     // Check for duplicate work_order_number
     let query = 'SELECT id FROM records WHERE work_order_number = ?';
     let params = [data.work_order_number];
@@ -33,15 +42,15 @@ const validateRecord = (data, confidenceScores, currentRecordId = null) => {
     }
   }
 
-  if (data.machine_number && !/^MCH-\d{3,6}$/i.test(data.machine_number)) {
-    errors.push("Invalid machine number format. Expected MCH-XXXX");
+
+
+  if (data.machine_number && !/^MC-\d{3}$/i.test(data.machine_number)) {
+    errors.push("Invalid machine number format. Expected MC-XXX");
   }
 
-  if (data.operation_code && !/^OPC-\d{3,6}$/i.test(data.operation_code)) {
-    errors.push("Invalid operation code format. Expected OPC-XXXX");
-  }
-
-  if (data.quantity_produced !== null && data.quantity_produced !== undefined) {
+  if (data.quantity_produced === null || data.quantity_produced === undefined || data.quantity_produced === '') {
+    errors.push("Quantity produced is required");
+  } else {
     const qty = Number(data.quantity_produced);
     if (isNaN(qty) || qty <= 0) {
       errors.push("Quantity produced must be greater than 0");
@@ -66,17 +75,12 @@ const validateRecord = (data, confidenceScores, currentRecordId = null) => {
     }
   }
 
-  if (!data.supervisor) {
-    warnings.push("Supervisor not recorded");
-  }
 
-  if (!data.product_code) {
-    warnings.push("Product code not recorded");
-  }
 
   if (confidenceScores) {
+    const requiredFields = ['date', 'shift', 'employee_number', 'work_order_number', 'quantity_produced'];
     for (const [field, score] of Object.entries(confidenceScores)) {
-      if (score < 0.5) {
+      if (score < 0.5 && requiredFields.includes(field)) {
         warnings.push(`Low confidence on field: ${field}`);
       }
     }

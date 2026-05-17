@@ -199,13 +199,13 @@ export default function Upload() {
                         </div>
                       </div>
                     </div>
-                    {up.status === 'done' && up.record_id && (
+                    {up.status === 'done' && up.record_count > 0 && (
                       <div className="mt-3">
                         <Link 
-                          to={`/review/${up.record_id}`}
+                          to={`/history?upload_id=${up.id}`}
                           className="text-xs font-medium text-indigo-600 hover:text-indigo-800 flex items-center"
                         >
-                          Review extracted data &rarr;
+                          Review {up.record_count} extracted row{up.record_count !== 1 ? 's' : ''} &rarr;
                         </Link>
                       </div>
                     )}

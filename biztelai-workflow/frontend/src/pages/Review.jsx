@@ -68,15 +68,25 @@ export default function Review() {
 
       const res = await client.patch(`/records/${id}`, payload);
       if (res.data.success) {
-        showToast('Record updated successfully');
-        setRecord((prev) => ({
-          ...prev,
-          ...res.data.data,
-          validation_errors: res.data.data.errors || [], // from patch response validationResult
-          validation_warnings: res.data.data.warnings || []
-        }));
-        if (status === 'reviewed') {
+        const finalStatus = res.data.data.status;
+        
+        if (finalStatus === 'reviewed') {
+          showToast('Record approved successfully');
+          setRecord((prev) => ({
+            ...prev,
+            ...res.data.data,
+            validation_errors: [],
+            validation_warnings: res.data.data.warnings || []
+          }));
           setTimeout(() => navigate('/history'), 1500);
+        } else {
+          showToast('Record saved, but flagged due to remaining errors', 'error');
+          setRecord((prev) => ({
+            ...prev,
+            ...res.data.data,
+            validation_errors: res.data.data.errors || [], 
+            validation_warnings: res.data.data.warnings || []
+          }));
         }
       }
     } catch (err) {
@@ -97,10 +107,25 @@ export default function Review() {
     }
   };
 
+  const getActiveErrors = () => {
+    const backendErrors = record.validation_errors || [];
+    return backendErrors.filter(err => {
+      const e = err.toLowerCase();
+      if (e.includes('shift') && ['A', 'B', 'C', 'Night'].includes(formData.shift)) return false;
+      if (e.includes('date is required') && formData.date) return false;
+      if (e.includes('invalid date format') && /^\d{4}-\d{2}-\d{2}$/.test(formData.date) && !isNaN(new Date(formData.date).getTime())) return false;
+      if (e.includes('employee number is required') && formData.employee_number) return false;
+      if (e.includes('invalid employee number') && /^BT\d{4}$/i.test(formData.employee_number)) return false;
+      if (e.includes('work order number is required') && formData.work_order_number) return false;
+      if (e.includes('invalid work order format') && /^\d{6}$/.test(formData.work_order_number)) return false;
+      if (e.includes('quantity') && Number(formData.quantity_produced) > 0) return false;
+      if (e.includes('invalid machine number') && /^MC-\d{3}$/i.test(formData.machine_number)) return false;
+      return true;
+    });
+  };
+
   const getFieldError = (fieldName) => {
-    if (!record?.validation_errors) return null;
-    // Map backend error messages to fields by string matching (simplified for UI)
-    const errors = record.validation_errors;
+    const activeErrors = getActiveErrors();
     const nameMap = {
       date: 'Date', shift: 'shift', employee_number: 'Employee number',
       work_order_number: 'Work order', machine_number: 'machine number',
@@ -108,7 +133,7 @@ export default function Review() {
     };
     const key = nameMap[fieldName];
     if (!key) return null;
-    return errors.find(e => e.toLowerCase().includes(key.toLowerCase()));
+    return activeErrors.find(e => e.toLowerCase().includes(key.toLowerCase()));
   };
 
   const getFieldWarning = (fieldName) => {
@@ -135,10 +160,10 @@ export default function Review() {
     return <div className="p-8 text-center text-rose-500">Record not found.</div>;
   }
 
-  const errors = record.validation_errors || [];
+  const errors = getActiveErrors();
   const warnings = record.validation_warnings || [];
   const scores = record.confidence_scores || {};
-  const docUrl = `/api/data/uploads/${record.filename}`;
+  const docUrl = `/data/uploads/${record.filename}`;
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
